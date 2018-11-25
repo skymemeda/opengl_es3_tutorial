@@ -2,6 +2,8 @@
 #include <GLES3/gl3.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 const char * vertShader = R"(#version 300 es
 layout ( location = 0 ) in vec3 vPos;
@@ -18,35 +20,37 @@ void main()
 
 const char * fragShader = R"(#version 300 es
 precision mediump float;
-uniform sampler2D samTex;
+uniform sampler2D samBase;
+uniform sampler2D samGirl;
 in vec2 uv;
 
 out vec4 fragColor;
 void main()
 {
-	fragColor = texture( samTex,uv );
+	fragColor = texture( samBase,uv ) * texture( samGirl,uv );
 }
 )";
 
 float triangleVerts[] = {
-	-1.0f, -1.f, 0.0f, 0,1,
-	0.0f, 1.f, 0.0f,1,0,
-	1.0f, -1.f, 0.0f,1,1
+	-0.5f, 0.5f, 0.0f, 0,1,//左上角
+	0.5f, 0.5f, 0.0f,1,1,//右上角
+	0.5f, -0.5f, 0.0f,1,0,//右下角
+	-0.5f,-0.5f,0.0f,0,0//左下角
 };
 
 uint16_t indexBuffer[] = {
-	0, 1, 2
+	3,0,2,1
 };
 
 uint32_t pixel[] = {
-	0xffffffff,0xffffffff,0xff000000,0xff000000,0xffffffff,0xffffffff,0xff000000,0xff000000,
-	0xffffffff,0xffffffff,0xff000000,0xff000000,0xffffffff,0xffffffff,0xff000000,0xff000000,
+	0xffffffff,0xffffffff,0xffffffff,0xffffffff,0xffffffff,0xffffffff,0xffffffff,0xffffffff,
+	0xffffffff,0xffffffff,0xff00ff00,0xff001100,0xffffffff,0xffffffff,0xff0000ff,0xff0000ff,
 	0xff000000,0xff000000,0xffffffff,0xffffffff,0xff000000,0xff000000,0xffffffff,0xffffffff,
 	0xff000000,0xff000000,0xffffffff,0xffffffff,0xff000000,0xff000000,0xffffffff,0xffffffff,
 	0xffffffff,0xffffffff,0xff000000,0xff000000,0xffffffff,0xffffffff,0xff000000,0xff000000,
 	0xffffffff,0xffffffff,0xff000000,0xff000000,0xffffffff,0xffffffff,0xff000000,0xff000000,
-	0xff000000,0xff000000,0xffffffff,0xffffffff,0xff000000,0xff000000,0xffffffff,0xffffffff,
-	0xff000000,0xff000000,0xffffffff,0xffffffff,0xff000000,0xff000000,0xffffffff,0xffffffff,
+	0xffff0000,0xffff0000,0xffffffff,0xffffffff,0xff000000,0xff000000,0xffffffff,0xffffffff,
+	0xffff0000,0xffff0000,0xffffffff,0xffffffff,0xff000000,0xff000000,0xffffffff,0xffffffff,
 };
 
 bool AppDelegate::initialize(void* _wnd)
@@ -61,6 +65,30 @@ bool AppDelegate::initialize(void* _wnd)
 	{
 		return false;
 	}
+
+	FILE* file = fopen("texture.jpg","rb");
+	if (!file)
+	{
+		return false;
+	}
+	auto begin = ftell(file);
+	fseek(file,0,SEEK_END);
+	auto end = ftell(file);
+
+	char* buffer = new char[end - begin];
+	fseek(file, 0, SEEK_SET);
+	fread(buffer, 1, end - begin, file);
+	fclose(file);
+
+	int x, y, n;
+	stbi_uc * imageBytes = stbi_load_from_memory((const stbi_uc*)buffer, end-begin, &x, &y, &n, 4);
+	//assert(x == 256 && y == 256);
+	glGenTextures(1, &_texture2);
+	glBindTexture(GL_TEXTURE_2D, _texture2);
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, x, y);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, x, y, GL_RGBA, GL_UNSIGNED_BYTE, imageBytes);
+	stbi_image_free(imageBytes);
+	delete[]buffer;
 	//
 	glGenSamplers(1, &_sampler);
 	glSamplerParameteri(_sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -145,35 +173,33 @@ bool AppDelegate::initialize(void* _wnd)
 	GLsizei name_len;
 	GLenum type;
 	GLint size;
-	GLint loc;
-	char namebuff[1024];
+	GLint samplerLocation;
+	char samplerName[1024];
 	// 绑定槽计数
-
-	uint32_t texLoc;
-	uint32_t texIndex = 0;
+	uint32_t textureSlot = 0;
 
 	for (GLint idx = 0; idx < nUniform; ++idx)
 	{
-		glGetActiveUniform(_prog, idx, 1024, &name_len, &size, &type, namebuff);
-		loc = glGetUniformLocation(_prog, namebuff);
+		glGetActiveUniform(_prog, idx, 1024, &name_len, &size, &type, samplerName);
+		samplerLocation = glGetUniformLocation(_prog, samplerName);
 		switch (type)
 		{
 		case GL_SAMPLER_2D:
 		{
-			_unifTex2D.push_back({ namebuff, loc, texIndex });
-			++texIndex;
+			_unifTex2D.push_back({ samplerName, samplerLocation, textureSlot });
+			++textureSlot;
 			break;
 		}
 		case GL_SAMPLER_2D_SHADOW:
 		{
-			_unifTexDepth.push_back({ namebuff, loc, texIndex });
-			++texIndex;
+			_unifTexDepth.push_back({ samplerName, samplerLocation, textureSlot });
+			++textureSlot;
 			break;
 		}
 		case GL_SAMPLER_CUBE:
 		{
-			_unifTexCube.push_back({ namebuff, loc, texIndex });
-			++texIndex;
+			_unifTexCube.push_back({ samplerName, samplerLocation, textureSlot });
+			++textureSlot;
 			break;
 		}
 		default:
@@ -185,11 +211,16 @@ bool AppDelegate::initialize(void* _wnd)
 	//
 	for (auto& samplerSlot : _unifTex2D)
 	{
-		if (samplerSlot.name == "samTex")
+		if (samplerSlot.name == "samBase")
 		{
 			_samplerUniformLoc = samplerSlot.uniformLoc;
 			_textureUnit = samplerSlot.textureUnit;
-			break;
+			//break;
+		}
+		if (samplerSlot.name == "samGirl")
+		{
+			_samplerUniformLoc2 = samplerSlot.uniformLoc;
+			_textureUnit2 = samplerSlot.textureUnit;
 		}
 	}
 
@@ -220,16 +251,29 @@ void AppDelegate::tick()
 	glClearColor(1.0f, 1.0f, 0.5f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+
+	// 绑定 采样器<->纹理
+	glActiveTexture(_textureUnit2 + GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, _texture2);
+	glBindSampler(_textureUnit2, _sampler);
+	// 把采样器绑定到着色器上去
+	glUniform1i(_samplerUniformLoc2, _textureUnit2);
+
+	// 绑定 采样器<->纹理
 	glActiveTexture(_textureUnit + GL_TEXTURE0 );
 	glBindTexture(GL_TEXTURE_2D, _texture);
-
 	glBindSampler(_textureUnit, _sampler);
+	// 把采样器绑定到着色器上去
 	glUniform1i(_samplerUniformLoc, _textureUnit );
+
+
+
+
 
 	glBindVertexArray(_vao);
 	glUseProgram(_prog);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _ibo);
-	glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, nullptr);
+	glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, nullptr);
 }
 
 const char * AppDelegate::title()

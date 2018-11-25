@@ -22,10 +22,13 @@ private:
 	GLuint _vao;
 	//
 	GLuint _texture;
+	GLuint _texture2;
 	//
 	GLuint _sampler;
 	int _samplerUniformLoc;
 	uint32_t _textureUnit;
+	int _samplerUniformLoc2;
+	uint32_t _textureUnit2;
 	//
 	std::vector< SamplerSlot > _unifTex2D;
 	std::vector< SamplerSlot > _unifTexCube;
