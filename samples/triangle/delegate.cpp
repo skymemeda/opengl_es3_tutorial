@@ -5,30 +5,36 @@
 
 const char * vertShader = R"(#version 300 es
 layout ( location = 0 ) in vec3 vPos;
+layout ( location = 1 ) in vec3 vColor;
+
+out vec3 Color;
+
 void main()
 {
+	Color = vColor;
 	gl_Position = vec4( vPos, 1.0f );
 }
 )";
 
 const char * fragShader = R"(#version 300 es
 precision mediump float;
+in vec3 Color;
 out vec4 fragColor;
+
 void main()
 {
-	fragColor = vec4(1.0f, 0.0f, 0.0f, 1.0f);
+	fragColor = vec4( Color, 1.0f );
 }
 )";
 
 float triangleVerts[] = {
-	-0.5f, 0.5f, 0.0f,
-	0.5f, 0.5f, 0.0f,
-	-0.5f, -0.5f, 0.0f,
-	0.5f,-0.5f,0.0f,
+	-1.0f, -1.f, 0.0f, 1.0f, 0.0f, 0.0f,
+	0.0f, 1.f, 0.0f,0.0f, 1.0f, 0.0f,
+	1.0f, -1.f, 0.0f,0.0f, 0.0f, 1.0f,
 };
 
 uint16_t indexBuffer[] = {
-	0,1,2,1,2,3,
+	0, 1, 2
 };
 
 bool AppDelegate::initialize(void* _wnd)
@@ -43,8 +49,10 @@ bool AppDelegate::initialize(void* _wnd)
 
 	glGenVertexArrays(1, &_vao);
 	glBindVertexArray(_vao);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0); 
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0); 
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(sizeof(float)*3));
 	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
 
 	glBindVertexArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -123,12 +131,12 @@ void AppDelegate::tick()
 	glBindVertexArray(_vao);
 	glUseProgram(_prog);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _ibo);
-	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr);
+	glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, nullptr);
 }
 
 const char * AppDelegate::title()
 {
-	return "Hello,OpenGL!";
+	return "triangle";
 }
 
 IApplication * GetApplication()
